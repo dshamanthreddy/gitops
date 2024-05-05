@@ -1,0 +1,96 @@
+#############
+CompositeResourceDefinition
+###########################
+
+---
+apiVersion: apiextensions.crossplane.io/v1
+kind: CompositeResourceDefinition
+metadata:
+  name: simplenetworks.nopnithi.com
+spec:
+  group: nopnithi.com
+  names:
+    kind: SimpleNetwork
+    plural: simplenetworks
+  claimNames:
+    kind: SimpleNetworkClaim
+    plural: simplenetworkclaims
+  versions:
+    - name: v1alpha1
+      served: true
+      referenceable: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: "The name of the network."
+                size:
+                  type: string
+                  description: "The size of the network."
+                  enum:
+                    - small
+                    - medium
+                    - large
+                location:
+                  type: string
+                  description: "The location of the network."
+                  enum:
+                    - sg
+                    - us
+              required:
+                - name
+                - size
+                - location
+
+
+
+#############
+CompositeResourceDefinition
+###########################
+
+
+
+cat  <<EOF  |  kubectl  apply  -f - 
+apiVersion: apiextensions.crossplane.io/v1 
+kind: CompositeResourceDefinition 
+metadata: 
+  name: nopnithiwebapps.custom-api.example.org 
+spec: 
+  group: custom-api.example.org 
+  names: 
+    kind: NopnithiWebApp 
+    plural: nopnithiwebapps 
+  versions : 
+    -  name: v1alpha1 
+       served: true 
+       referenceable: true 
+       schema: 
+         openAPIV3Schema: 
+           type:  object 
+           properties: 
+             spec: 
+               type:  object 
+               properties: 
+                 appName: 
+                   type:  string 
+                   description:  "The name of the application." 
+                 size: 
+                   type:  string 
+                   description:  "The size of the instance." 
+                   enum: 
+                    -  small 
+                    -  medium 
+                    -  large 
+               required: 
+                -  size 
+                -  appName 
+  claimNames: 
+    kind:  CustomNopnithiWebApp 
+    plural:  customnopnithiwebapps 
+EOF
+

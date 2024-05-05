@@ -1,0 +1,237 @@
+###########
+Composition
+###########
+
+---
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: aws-simplenetwork
+  labels:
+    provider: aws
+spec:
+  # Defines which custom APIs (XRDs) for this template (composition) to create resources.
+  compositeTypeRef:
+    apiVersion: nopnithi.com/v1alpha1
+    kind: SimpleNetwork
+  patchSets:
+    - name: provider
+      patches:
+        - fromFieldPath: spec.compositionSelector.matchLabels.provider
+          toFieldPath: spec.providerConfigRef.name
+          transforms:
+            - type: string
+              string:
+                type: Format
+                fmt: "%s-default"
+    - name: region
+      patches:
+        - fromFieldPath: spec.location
+          toFieldPath: spec.forProvider.region
+          transforms:
+            - type: map
+              map:
+                sg: ap-southeast-1
+                us: us-east-1
+    - name: tags
+      patches:
+        - fromFieldPath: spec.name
+          toFieldPath: spec.forProvider.tags.Name
+  # Defines the managed resources (MRs) that this template (composition) creates.
+  resources:
+    - name: vpc
+      base:
+        apiVersion: ec2.aws.upbound.io/v1beta1
+        kind: VPC
+        spec:
+          forProvider:
+            enableDnsSupport: true
+            enableDnsHostnames: true
+            tags:
+              Name: simplenetwork-vpc
+      patches:
+        - type: PatchSet
+          patchSetName: provider
+        - type: PatchSet
+          patchSetName: region
+        - type: PatchSet
+          patchSetName: tags
+        - fromFieldPath: spec.size
+          toFieldPath: spec.forProvider.cidrBlock
+          transforms:
+            - type: map
+              map:
+                small: 10.0.0.0/24
+                medium: 10.0.0.0/20
+                large: 10.0.0.0/16
+    - name: public-subnet
+      base:
+        apiVersion: ec2.aws.upbound.io/v1beta1
+        kind: Subnet
+        metadata:
+          labels:
+            networkType: public
+        spec:
+          forProvider:
+            vpcIdSelector:
+              matchControllerRef: true
+            tags:
+              Name: simplenetwork-public-subnet
+      patches:
+        - type: PatchSet
+          patchSetName: provider
+        - type: PatchSet
+          patchSetName: region
+        - type: PatchSet
+          patchSetName: tags
+        - fromFieldPath: spec.size
+          toFieldPath: spec.forProvider.cidrBlock
+          transforms:
+            - type: map
+              map:
+                small: 10.0.0.0/26
+                medium: 10.0.0.0/22
+                large: 10.0.0.0/18
+        - fromFieldPath: spec.location
+          toFieldPath: spec.forProvider.availabilityZone
+          transforms:
+            - type: map
+              map:
+                sg: ap-southeast-1
+                us: us-east-1
+            - type: string
+              string:
+                type: Format
+                fmt: "%sa"
+    - name: internet-gateway
+      base:
+        apiVersion: ec2.aws.upbound.io/v1beta1
+        kind: InternetGateway
+        spec:
+          forProvider:
+            vpcIdSelector:
+              matchControllerRef: true
+            tags:
+              Name: simplenetwork-internet-gateway
+      patches:
+        - type: PatchSet
+          patchSetName: provider
+        - type: PatchSet
+          patchSetName: region
+        - type: PatchSet
+          patchSetName: tags
+    - name: default-route-table
+      base:
+        apiVersion: ec2.aws.upbound.io/v1beta1
+        kind: DefaultRouteTable
+        spec:
+          forProvider:
+            defaultRouteTableIdSelector:
+              matchControllerRef: true
+            route:
+              - cidrBlock: 0.0.0.0/0
+                gatewayIdSelector:
+                  matchControllerRef: true
+            tags:
+              Name: simplenetwork-default-route-table
+      patches:
+        - type: PatchSet
+          patchSetName: provider
+        - type: PatchSet
+          patchSetName: region
+        - type: PatchSet
+          patchSetName: tags
+
+
+###########
+Composition
+###########
+
+cat  <<EOF  |  kubectl  apply  -f - 
+apiVersion: apiextensions.crossplane.io/v1 
+kind: Composition 
+metadata: 
+  name: webapp 
+spec: 
+  compositeTypeRef: 
+    apiVersion: custom-api.example.org/v1alpha1 
+    kind: NopnithiWebApp 
+  resources: 
+    -  name: vpc 
+       base: 
+        apiVersion: ec2.aws.upbound.io/v1beta1 
+        kind: VPC 
+        metadata: 
+          name: nopnithi-crossplane-vpc 
+          labels: 
+            crossplane-demo.nopnithi.com/name: webapp-vpc 
+        spec: 
+          forProvider: 
+            region: us-east-1
+            cidrBlock: 10.0.0.0/16 
+            tags: 
+              Name: nopnithi-crossplane-vpc 
+    -  name: subnet 
+       base: 
+        apiVersion: ec2.aws.upbound.io/v1beta1 
+        kind: Subnet 
+        metadata: 
+          name: nopnithi-crossplane-subnet 
+          labels: 
+            crossplane-demo.nopnithi.com/name: webapp-subnet 
+        spec: 
+          forProvider: 
+            region: us-east-1
+            availabilityZone: ap-southeast-1a 
+            vpcIdSelector: 
+              matchLabels: 
+                crossplane-demo.nopnithi.com/name: webapp-vpc 
+            cidrBlock: 10.0.0.0/24 
+            tags: 
+              Name: nopnithi-crossplane-subnet 
+    -  name: interface 
+       base: 
+        apiVersion: ec2.aws.upbound.io/v1beta1 
+        kind: NetworkInterface 
+        metadata: 
+          labels: 
+            crossplane-demo.nopnithi.com/name: webapp-interface 
+          name: webapp-interface 
+        spec: 
+          forProvider: 
+            region: us-east-1
+            subnetIdSelector: 
+              matchLabels: 
+                crossplane-demo.nopnithi.com/name:  webapp-subnet 
+    -  name: instance 
+       base: 
+        apiVersion: ec2.aws.upbound.io/v1beta1 
+        kind: Instance 
+        metadata: 
+          labels: 
+            crossplane-demo.nopnithi.com/name: webapp-instance 
+          name: webapp-instance 
+        spec: 
+          forProvider: 
+            region: us-east-1
+            ami: ami-07caf09b362be10b8 
+            instanceType: t3.small 
+            networkInterface: 
+              -  deviceIndex:  0
+                 networkInterfaceIdSelector: 
+                  matchLabels: 
+                    crossplane-demo.nopnithi.com/name: webapp-interface 
+            creditSpecification: 
+              -  cpuCredits: unlimited 
+       patches: 
+        -  fromFieldPath:  "spec.size" 
+           toFieldPath:  "spec.forProvider.instanceType" 
+           transforms: 
+            -  type:  map 
+               map: 
+                small:  t3.small 
+                medium:  t3.medium 
+                large:  t3.large 
+        -  fromFieldPath:  "spec.appName" 
+           toFieldPath:  "spec.forProvider.tags.Name" 
+EOF

@@ -1,0 +1,16 @@
+
+Check the status of the Composite Resource (XR):
+kubectl get <composite-resource-name> -n <namespace>
+
+Describe the Composite Resource (XR):
+
+kubectl describe <composite-resource-name> -n <namespace>
+
+View the logs of the Crossplane controller:
+kubectl logs -n crossplane-system <deployment-name> -c <container-name>
+
+View the logs of the Crossplane controller:
+kubectl describe <managed-resource-kind> <managed-resource-name> -n <namespace>
+
+Check the events for the Composite Resource (XR):
+kubectl get events --field-selector=involvedObject.kind=<composite-resource-kind>,involvedObject.name=<composite-resource-name> -n <namespace>
